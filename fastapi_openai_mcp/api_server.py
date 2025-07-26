@@ -1,14 +1,12 @@
 """API server interacting with OpenAI and an MCP service."""
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
-import json
 import os
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from dotenv import load_dotenv
-import httpx
 import openai
 
 load_dotenv()
@@ -19,8 +17,8 @@ MCP_SERVER_URL: str | None = os.getenv("MCP_SERVER_URL")
 
 openai_client = openai.AsyncOpenAI()
 
-# Model used for OpenAI function calling
-OPENAI_MODEL = "gpt-4-turbo"
+# Model used for OpenAI tool calling
+OPENAI_MODEL = "openai-4.1"
 
 app = FastAPI()
 
@@ -40,12 +38,11 @@ async def chat(req: ChatRequest) -> Dict[str, str]:
 
     tools: List[Dict[str, Any]] = [
         {
-            "type": "function",
-            "function": {
-                "name": "get_server_time",
-                "description": "Get the server time from the MCP service",
-                "parameters": {"type": "object", "properties": {}},
-            },
+            "type": "mcp",
+            "server_label": "local_mcp",
+            "server_url": MCP_SERVER_URL,
+            "headers": {"Authorization": f"Bearer {MCP_API_KEY}"},
+            "allowed_tools": ["get_server_time"],
         }
     ]
 
@@ -54,30 +51,11 @@ async def chat(req: ChatRequest) -> Dict[str, str]:
         input=req.message,
         tools=tools,
     )
+
     output = response["output"][0]
-    if output.get("type") == "function_call":
-        call = output
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{MCP_SERVER_URL}/server_time",
-                headers={"Authorization": f"Bearer {MCP_API_KEY}"},
-            )
-            resp.raise_for_status()
-            tool_result = resp.json()
-        followup = await openai_client.responses.create(
-            model=OPENAI_MODEL,
-            previous_response_id=response["id"],
-            input=json.dumps(tool_result),
-        )
-        final_output = followup["output"][0]
-        if final_output.get("type") == "message":
-            final_message = final_output["content"][0]["text"]
-        else:
-            final_message = ""
+    if output.get("type") == "message":
+        final_message = output["content"][0]["text"]
     else:
-        if output.get("type") == "message":
-            final_message = output["content"][0]["text"]
-        else:
-            final_message = ""
+        final_message = ""
 
     return {"answer": final_message}

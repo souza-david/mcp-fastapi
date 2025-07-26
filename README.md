@@ -1,9 +1,9 @@
 # FastAPI OpenAI MCP Sample
 
-This repository provides a minimal example of two FastAPI services working together with an OpenAI function‑calling agent.
+This repository provides a minimal example of two FastAPI services working together with an OpenAI MCP tool‑calling agent.
 
 * `fastapi_openai_mcp/mcp_server.py` – a protected MCP server exposing `/server_time`.
-* `fastapi_openai_mcp/api_server.py` – an API server that calls OpenAI's **Responses API** and delegates to the MCP server when the model requests it.
+* `fastapi_openai_mcp/api_server.py` – an API server that calls OpenAI's **Responses API** which in turn invokes the MCP server via the tools feature.
 
 ## Setup
 
@@ -29,7 +29,7 @@ In another terminal, start the API server on port 8000:
 ```bash
 uvicorn fastapi_openai_mcp.api_server:app --port 8000
 ```
-The API server uses OpenAI's `gpt-4-turbo` model with function calling enabled via the **Responses API**.
+The API server uses OpenAI's `openai-4.1` model with MCP tool calling enabled via the **Responses API**.
 
 ## Using the API
 
