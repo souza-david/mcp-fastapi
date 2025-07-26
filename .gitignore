@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 .coverage
 fastapi_openai_mcp.egg-info/
+.env
