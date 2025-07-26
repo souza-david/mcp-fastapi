@@ -19,18 +19,18 @@ This repository provides a complete example of integrating a FastAPI MCP (Model 
 
 1. Create a virtual environment and activate it:
    ```bash
-   python -m venv .venv
+   python3 -m venv .venv
    source .venv/bin/activate
    ```
 
 2. Install dependencies with [uv](https://github.com/astral-sh/uv):
    ```bash
-   uv pip install -e .[dev]
+   uv pip install -e ".[dev]"
    ```
    
    Or with pip:
    ```bash
-   pip install -e .[dev]
+   pip install -e ".[dev]"
    ```
 
 3. Copy `.env.example` to `.env` and configure:
@@ -57,6 +57,19 @@ In another terminal, start the API server on port 8000:
 ```bash
 source .venv/bin/activate
 uvicorn fastapi_openai_mcp.api_server:app --port 8000
+```
+
+### Troubleshooting: Port Already in Use
+
+If you get "address already in use" errors, check and kill existing processes:
+
+```bash
+# Check what's using the ports
+lsof -i :8001
+lsof -i :8000
+
+# Kill processes by PID (replace XXXX with actual PID)
+kill XXXX
 ```
 
 ## Using the API
