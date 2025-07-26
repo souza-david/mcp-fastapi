@@ -25,4 +25,4 @@ async def get_server_time(authorization: str | None = Header(None)) -> Dict[str,
     if token != MCP_API_KEY:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
     now = datetime.now(timezone.utc).isoformat()
-    return {"server_time": now}
+    return {"server_time": f"[MCP Server Time] {now}"}
