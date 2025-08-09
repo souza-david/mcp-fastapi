@@ -33,17 +33,77 @@ This repository provides a complete example of integrating a FastAPI MCP (Model 
    pip install -e ".[dev]"
    ```
 
-3. Copy `.env.example` to `.env` and configure:
+3. Create a `.env` file and configure:
    ```bash
-   cp .env.example .env
+   # Copy .env.example to .env and configure:
+   # cp .env.example .env
+   cat > .env <<'EOF'
+   MCP_API_KEY=changeme
+   MCP_SERVER_URL=http://localhost:8001
+   OPENAI_API_KEY=sk-...
+   LOG_LEVEL=info
+   EOF
    ```
    
-   Edit `.env` and set:
-   - `MCP_API_KEY`: A secret key for MCP authentication (e.g., `mysecretkey`)
-   - `MCP_SERVER_URL`: URL where MCP server will run (default: `http://localhost:8001`)
+   Required variables:
+   - `MCP_API_KEY`: A secret key for MCP authentication (choose a strong value)
+   - `MCP_SERVER_URL`: Base URL where the MCP server is reachable (default: `http://localhost:8001`)
    - `OPENAI_API_KEY`: Your OpenAI API key
+   - `LOG_LEVEL` (optional): `debug`, `info`, `warning`, `error` (default: `info`)
 
-## Running the Servers
+## Run with Docker (recommended quickstart)
+
+This repo ships a single image capable of running either service via `SERVICE=api` or `SERVICE=mcp`.
+
+1) Build the image:
+```bash
+docker build -t mcp-fastapi:dev .
+```
+
+2) Create a Docker network for the two containers:
+```bash
+docker network create mcpnet || true
+```
+
+3) Start the MCP server (reads secrets from `.env`):
+```bash
+docker run -d --name mcp-server --network mcpnet \
+  --env-file .env -e SERVICE=mcp -e LOG_LEVEL=info \
+  -p 8001:8001 mcp-fastapi:dev
+```
+
+4) Start the API server (also reads `.env`, but override `MCP_SERVER_URL` to the container name):
+
+Important: If your `.env` has `MCP_SERVER_URL=http://localhost:8001`, that value is wrong from inside the container. Override it to `http://mcp-server:8001` so the API can reach the MCP container over the Docker network.
+```bash
+docker run -d --name api-server --network mcpnet \
+  --env-file .env -e SERVICE=api -e LOG_LEVEL=info \
+  -e MCP_SERVER_URL=http://mcp-server:8001 \
+  -p 8000:8000 mcp-fastapi:dev
+```
+
+5) Verify logs (they show presence of secrets, never values):
+```bash
+docker logs mcp-server | tail -n +1
+docker logs api-server | tail -n +1
+```
+
+6) Validate MCP auth behavior (401 without auth, OK with either header):
+```bash
+curl -i http://localhost:8001/server_time | head -n 1                # 401
+curl -s -H "Authorization: Bearer ${MCP_API_KEY}" http://localhost:8001/server_time
+curl -s -H "X-Api-Key: ${MCP_API_KEY}" http://localhost:8001/server_time
+```
+
+7) End-to-end chat (requires valid `OPENAI_API_KEY`):
+```bash
+curl -s -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What is the current server time?"}'
+```
+Response includes the `[MCP Server Time]` prefix proving the agent called the MCP.
+
+## Running the Servers (local dev without Docker)
 
 **Note**: Always activate the virtual environment before running servers.
 
@@ -72,7 +132,7 @@ lsof -i :8000
 kill XXXX
 ```
 
-## Using the API
+## Using the API (for both Docker and local dev)
 
 Send a chat request that requires server time:
 ```bash
@@ -113,7 +173,7 @@ source .venv/bin/activate
 pytest tests/ -v
 ```
 
-## Integration Testing
+## Integration Testing (local dev)
 
 **Real end-to-end testing** with OpenAI API and running servers:
 
@@ -185,3 +245,11 @@ pyproject.toml       # Project dependencies
 - `python-dotenv`: Environment variable management
 - `openai`: Official OpenAI SDK
 - `pytest`, `pytest-asyncio`: Testing tools
+
+## Cloud Run deployment notes
+
+- The MCP server accepts either `Authorization: Bearer <token>` or `X-Api-Key: <token>`. Cloud Run may reserve or modify the `Authorization` header, so prefer calling with `X-Api-Key` from external clients. The API server in this repo sends both headers.
+- Deploy two services from the same image:
+  - MCP: set `SERVICE=mcp`, `MCP_API_KEY`, `LOG_LEVEL=info`.
+  - API: set `SERVICE=api`, `OPENAI_API_KEY`, `MCP_API_KEY` (same value as MCP), and `MCP_SERVER_URL` to the MCP service URL.
+- Logs only show boolean presence for secrets, not their values.
