@@ -13,7 +13,6 @@ This repository provides a complete example of integrating a FastAPI MCP (Model 
 - **MCP Verification**: The MCP server adds a `[MCP Server Time]` prefix to prove the time comes from MCP, not the model's internal knowledge
 - **Bearer Token Authentication**: MCP server is protected with token-based auth
 - **Comprehensive Tests**: 11 tests including unit tests, integration tests, and real E2E validation
-- **Type Safety**: All functions are fully typed
 
 ## Setup
 
